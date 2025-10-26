@@ -1,0 +1,547 @@
+'use client';
+
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import { WalletDefault } from '@coinbase/onchainkit/wallet';
+import { LayoutDashboard, Users, TrendingUp, FileText, Bell, Settings, Edit, Home, ArrowRightLeft, Phone, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { DbConnection, type ExchangeRequest, RequestStatus } from '@/spacetime_module_bindings';
+import { useAccount } from 'wagmi';
+import { Button } from '@/components/ui/button';
+
+export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'notifications' | 'exchanges'>('exchanges');
+  const { address } = useAccount();
+  const [db, setDb] = useState<DbConnection | null>(null);
+  const [exchangeRequests, setExchangeRequests] = useState<ExchangeRequest[]>([]);
+
+  const stats = [
+    { label: 'Total Users', value: '12,543', change: '+12%', icon: Users },
+    { label: 'Active Opportunities', value: '6', change: '+2', icon: TrendingUp },
+    { label: 'Weekly Engagement', value: '89%', change: '+5%', icon: FileText },
+    { label: 'Notifications Sent', value: '1,234', change: '+18%', icon: Bell },
+  ];
+
+  const opportunities = [
+    { id: 1, title: 'Base Batch 002', status: 'Active', views: 1234, clicks: 456 },
+    { id: 2, title: 'Zora Creator Pass', status: 'Active', views: 987, clicks: 321 },
+    { id: 3, title: 'Onchain Summer', status: 'Active', views: 2341, clicks: 789 },
+  ];
+
+  const topUsers = [
+    { address: '0x1234...5678', points: 98543, transactions: 15243 },
+    { address: '0x2345...6789', points: 89234, transactions: 14102 },
+    { address: '0x3456...7890', points: 82105, transactions: 12884 },
+  ];
+
+  // Connect to SpacetimeDB
+  useEffect(() => {
+    const connectDb = async () => {
+      try {
+        const conn = await DbConnection.builder()
+          .withUri('wss://testnet.spacetimedb.com')
+          .withModuleName('diyama_exchange')
+          .onConnect(async (ctx) => {
+            console.log('Admin connected to SpacetimeDB');
+            
+            // Subscribe to exchange requests
+            await ctx.db.exchangeRequest().onInsert((ctx, req) => {
+              setExchangeRequests(prev => [req, ...prev]);
+            });
+
+            await ctx.db.exchangeRequest().onUpdate((ctx, oldReq, newReq) => {
+              setExchangeRequests(prev => 
+                prev.map(r => r.requestId === newReq.requestId ? newReq : r)
+              );
+            });
+
+            // Load existing requests
+            const allRequests = Array.from(ctx.db.exchangeRequest().iter());
+            setExchangeRequests(allRequests.sort((a, b) => {
+              const timeA = a.createdAt.toDate().getTime();
+              const timeB = b.createdAt.toDate().getTime();
+              return timeB - timeA;
+            }));
+          })
+          .build();
+        
+        setDb(conn);
+      } catch (error) {
+        console.error('Failed to connect to SpacetimeDB:', error);
+      }
+    };
+
+    if (address) {
+      connectDb();
+    }
+
+    return () => {
+      if (db) {
+        db.disconnect();
+      }
+    };
+  }, [address]);
+
+  const getStatusIcon = (status: RequestStatus) => {
+    switch (status.tag) {
+      case 'Pending':
+        return <Clock className="w-5 h-5 text-yellow-400" />;
+      case 'InProgress':
+        return <ArrowRightLeft className="w-5 h-5 text-blue-400" />;
+      case 'Completed':
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />;
+      case 'Cancelled':
+        return <AlertCircle className="w-5 h-5 text-red-400" />;
+    }
+  };
+
+  const getStatusColor = (status: RequestStatus) => {
+    switch (status.tag) {
+      case 'Pending':
+        return 'text-yellow-400 bg-yellow-400/10';
+      case 'InProgress':
+        return 'text-blue-400 bg-blue-400/10';
+      case 'Completed':
+        return 'text-green-400 bg-green-400/10';
+      case 'Cancelled':
+        return 'text-red-400 bg-red-400/10';
+    }
+  };
+
+  const updateRequestStatus = (requestId: bigint, newStatus: RequestStatus) => {
+    if (db) {
+      db.reducers.updateRequestStatusAdmin(requestId, newStatus, `Status updated by admin`);
+    }
+  };
+
+  const pendingRequests = exchangeRequests.filter(r => r.status.tag === 'Pending');
+  const inProgressRequests = exchangeRequests.filter(r => r.status.tag === 'InProgress');
+  const completedRequests = exchangeRequests.filter(r => r.status.tag === 'Completed');
+
+  return (
+    <div className="min-h-screen bg-black text-white pb-24">
+      {/* Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="p-2 glass rounded-full hover:bg-white/10 transition-all">
+              <Home className="w-5 h-5 text-[#00F0FF]" />
+            </Link>
+            <h1 className="text-2xl font-bold gradient-text">Diyama Admin</h1>
+          </div>
+          <WalletDefault />
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <section className="pt-24 px-4 pb-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Hero */}
+          <motion.div
+            className="mb-12"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-4 bg-gradient-to-r from-[#0052FF] to-[#00F0FF] rounded-full">
+                <LayoutDashboard className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h2 className="text-4xl font-bold gradient-text">Dashboard Overview</h2>
+                <p className="text-[#CDE3FF]">Manage content, view analytics, and track community growth</p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            {stats.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.label}
+                  className="glass rounded-2xl p-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <Icon className="w-6 h-6 text-[#00F0FF]" />
+                    <span className="text-green-400 text-sm font-semibold">{stat.change}</span>
+                  </div>
+                  <p className="text-4xl font-bold text-white mb-2">{stat.value}</p>
+                  <p className="text-gray-400 text-sm">{stat.label}</p>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-4 mb-8 overflow-x-auto pb-2 hide-scrollbar">
+            {[
+              { id: 'exchanges' as const, label: 'Exchange Requests', icon: ArrowRightLeft, count: pendingRequests.length },
+              { id: 'content' as const, label: 'Content Management', icon: Edit },
+              { id: 'analytics' as const, label: 'Analytics', icon: TrendingUp },
+              { id: 'notifications' as const, label: 'Notifications', icon: Bell },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold whitespace-nowrap transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-[#0052FF] to-[#00F0FF] text-white'
+                      : 'glass text-[#CDE3FF] hover:bg-white/10'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {tab.label}
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className="ml-2 px-2 py-1 bg-red-500 rounded-full text-xs font-bold">
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Exchange Requests */}
+          {activeTab === 'exchanges' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="glass rounded-2xl p-8 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">USDC → Kwacha Exchange Requests</h3>
+                    <p className="text-gray-400 mt-1">
+                      {pendingRequests.length} pending • {inProgressRequests.length} in progress • {completedRequests.length} completed
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pending Requests */}
+                {pendingRequests.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className="text-xl font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Pending Requests ({pendingRequests.length})
+                    </h4>
+                    <div className="space-y-4">
+                      {pendingRequests.map((request) => (
+                        <div key={request.requestId.toString()} className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-3">
+                                {getStatusIcon(request.status)}
+                                <div>
+                                  <p className="text-xl font-bold text-white">
+                                    {request.usdcAmount} USDC → {request.kwachaAmount.toFixed(2)} ZMW
+                                  </p>
+                                  <p className="text-sm text-gray-400">
+                                    {new Date(request.createdAt.toDate()).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="grid md:grid-cols-2 gap-4 text-sm mb-4">
+                                <div>
+                                  <p className="text-gray-400">Name</p>
+                                  <p className="text-white font-semibold">{request.fullName}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-400">Phone</p>
+                                  <p className="text-white font-semibold flex items-center gap-2">
+                                    <Phone className="w-4 h-4" />
+                                    {request.phoneNumber}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-400">Wallet Address</p>
+                                  <p className="text-white font-mono text-xs">{request.userWalletAddress}</p>
+                                </div>
+                                {request.notes && (
+                                  <div>
+                                    <p className="text-gray-400">Notes</p>
+                                    <p className="text-white">{request.notes}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={() => updateRequestStatus(request.requestId, RequestStatus.InProgress)}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700"
+                            >
+                              Mark In Progress
+                            </Button>
+                            <Button
+                              onClick={() => updateRequestStatus(request.requestId, RequestStatus.Cancelled)}
+                              variant="outline"
+                              className="border-red-500 text-red-500 hover:bg-red-500/10"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* In Progress Requests */}
+                {inProgressRequests.length > 0 && (
+                  <div className="mb-8">
+                    <h4 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                      <ArrowRightLeft className="w-5 h-5" />
+                      In Progress ({inProgressRequests.length})
+                    </h4>
+                    <div className="space-y-4">
+                      {inProgressRequests.map((request) => (
+                        <div key={request.requestId.toString()} className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-3">
+                                {getStatusIcon(request.status)}
+                                <div>
+                                  <p className="text-xl font-bold text-white">
+                                    {request.usdcAmount} USDC → {request.kwachaAmount.toFixed(2)} ZMW
+                                  </p>
+                                  <p className="text-sm text-gray-400">
+                                    {new Date(request.createdAt.toDate()).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <p className="text-gray-400">Name</p>
+                                  <p className="text-white font-semibold">{request.fullName}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-400">Phone</p>
+                                  <p className="text-white font-semibold flex items-center gap-2">
+                                    <Phone className="w-4 h-4" />
+                                    {request.phoneNumber}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <Button
+                              onClick={() => updateRequestStatus(request.requestId, RequestStatus.Completed)}
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                            >
+                              Mark Completed
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Completed Requests */}
+                {completedRequests.length > 0 && (
+                  <div>
+                    <h4 className="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5" />
+                      Completed ({completedRequests.length})
+                    </h4>
+                    <div className="space-y-4">
+                      {completedRequests.slice(0, 5).map((request) => (
+                        <div key={request.requestId.toString()} className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {getStatusIcon(request.status)}
+                              <div>
+                                <p className="font-bold text-white">
+                                  {request.usdcAmount} USDC → {request.kwachaAmount.toFixed(2)} ZMW
+                                </p>
+                                <p className="text-sm text-gray-400">{request.fullName}</p>
+                              </div>
+                            </div>
+                            <span className="text-xs text-gray-400">
+                              {new Date(request.createdAt.toDate()).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {exchangeRequests.length === 0 && (
+                  <div className="text-center py-12">
+                    <ArrowRightLeft className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                    <p className="text-gray-400">No exchange requests yet</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Content Management */}
+          {activeTab === 'content' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="glass rounded-2xl p-8 mb-8">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-2xl font-bold text-white">Manage Opportunities</h3>
+                  <button className="px-6 py-3 bg-gradient-to-r from-[#0052FF] to-[#00F0FF] rounded-full font-semibold hover:shadow-[0_0_20px_rgba(0,82,255,0.6)] transition-all">
+                    Add New
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {opportunities.map((opp) => (
+                    <div key={opp.id} className="bg-white/5 rounded-xl p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="text-xl font-bold text-white mb-2">{opp.title}</h4>
+                          <span className="px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold">
+                            {opp.status}
+                          </span>
+                        </div>
+                        <button className="p-2 glass rounded-full hover:bg-white/10 transition-all">
+                          <Edit className="w-5 h-5 text-[#00F0FF]" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-gray-400 text-sm">Views</p>
+                          <p className="text-2xl font-bold text-white">{opp.views}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 text-sm">Clicks</p>
+                          <p className="text-2xl font-bold text-white">{opp.clicks}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass rounded-2xl p-8">
+                <h3 className="text-2xl font-bold text-white mb-6">Quick Actions</h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <button className="p-6 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-left">
+                    <FileText className="w-8 h-8 text-[#00F0FF] mb-3" />
+                    <p className="font-bold text-white">Update Banners</p>
+                    <p className="text-sm text-gray-400">Edit homepage banners</p>
+                  </button>
+                  <button className="p-6 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-left">
+                    <Settings className="w-8 h-8 text-[#00F0FF] mb-3" />
+                    <p className="font-bold text-white">Manage Links</p>
+                    <p className="text-sm text-gray-400">Update external links</p>
+                  </button>
+                  <button className="p-6 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-left">
+                    <Bell className="w-8 h-8 text-[#00F0FF] mb-3" />
+                    <p className="font-bold text-white">Send Notification</p>
+                    <p className="text-sm text-gray-400">Alert all users</p>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Analytics */}
+          {activeTab === 'analytics' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="glass rounded-2xl p-8 mb-8">
+                <h3 className="text-2xl font-bold text-white mb-6">Top Users</h3>
+                <div className="space-y-4">
+                  {topUsers.map((user, index) => (
+                    <div key={user.address} className="bg-white/5 rounded-xl p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-[#0052FF] to-[#00F0FF] flex items-center justify-center">
+                            <span className="text-xl font-bold">#{index + 1}</span>
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold text-white">{user.address}</p>
+                            <p className="text-sm text-gray-400">{user.transactions} transactions</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-[#00F0FF]">{user.points}</p>
+                          <p className="text-sm text-gray-400">points</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="glass rounded-2xl p-8">
+                <h3 className="text-2xl font-bold text-white mb-6">Activity Overview</h3>
+                <div className="h-64 flex items-center justify-center">
+                  <p className="text-[#CDE3FF]">Chart visualization coming soon</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Notifications */}
+          {activeTab === 'notifications' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <div className="glass rounded-2xl p-8">
+                <h3 className="text-2xl font-bold text-white mb-6">Send Notification</h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-white font-semibold mb-2">Title</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-3 glass rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0052FF]"
+                      placeholder="Enter notification title"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-semibold mb-2">Message</label>
+                    <textarea
+                      className="w-full px-4 py-3 glass rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0052FF] min-h-[120px]"
+                      placeholder="Enter notification message"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-white font-semibold mb-2">Target Audience</label>
+                    <select className="w-full px-4 py-3 glass rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#0052FF]">
+                      <option value="all">All Users</option>
+                      <option value="new">New Users</option>
+                      <option value="active">Active Users</option>
+                      <option value="top">Top Users</option>
+                    </select>
+                  </div>
+                  <button className="w-full px-6 py-4 bg-gradient-to-r from-[#0052FF] to-[#00F0FF] rounded-full font-bold text-lg hover:shadow-[0_0_30px_rgba(0,82,255,0.6)] transition-all">
+                    Send Notification
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
