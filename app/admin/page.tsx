@@ -1,81 +1,304 @@
-"use client"
+'use client'; 
+ 
+import { motion } from 'framer-motion'; 
+import Link from 'next/link'; 
+import { Menu, Search, User, Bell, BarChart2, Users, FileText, Settings, LogOut, LayoutDashboard, TrendingUp, Edit, Home, ArrowRightLeft, Phone, CheckCircle2, Clock, AlertCircle } from 'lucide-react'; 
+import { useState, useEffect } from 'react';
 
-import React, { useState } from 'react'
-import { Menu, Search, Bell, User, Settings, BarChart2, Users, FileText, Home, LogOut } from 'lucide-react'
+// Mock wagmi hook for development
+const useAccount = () => {
+  return { address: '0x1234...5678', isConnected: true };
+}; 
 
-export default function AdminPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+// Temporary mock components until we install the actual packages
+const WalletDefault = () => <div className="p-2 glass rounded-full">Connect Wallet</div>;
+const Button = ({ children, className, size, variant, onClick }: any) => (
+  <button 
+    onClick={onClick}
+    className={`px-4 py-2 rounded-md ${className || 'bg-blue-500 hover:bg-blue-600'} ${
+      size === 'sm' ? 'text-sm px-2 py-1' : ''
+    } ${variant === 'destructive' ? 'bg-red-500 hover:bg-red-600' : ''}`}
+  >
+    {children}
+  </button>
+);
 
+// Mock types and interfaces
+interface RequestStatus {
+  tag: string;
+  message: string;
+}
+
+interface ExchangeRequest {
+  requestId: { toString: () => string };
+  userAddress: string;
+  usdcAmount: { toString: () => string };
+  kwaAmount: { toString: () => string };
+  status: RequestStatus;
+  createdAt: { toDate: () => Date };
+}
+
+// Mock DbConnection for development
+interface DbContext {
+  db: {
+    exchangeRequest: () => {
+      onInsert: (callback: any) => Promise<void>;
+      onUpdate: (callback: any) => Promise<void>;
+      iter: () => any[];
+    };
+  };
+}
+
+class DbConnection {
+  static builder() {
+    return {
+      withUri: (uri: string) => ({
+        withModuleName: (moduleName: string) => ({
+          onConnect: (callback: (ctx: DbContext) => void) => ({
+            build: () => {
+              console.log('Mock DbConnection created');
+              return { uri, moduleName };
+            }
+          })
+        })
+      })
+    };
+  }
+}
+ 
+export default function AdminPage() { 
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'notifications' | 'exchanges' | 'dashboard' | 'users' | 'settings'>('exchanges'); 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { address } = useAccount(); 
+  const [db, setDb] = useState<any>(null); 
+  const [exchangeRequests, setExchangeRequests] = useState<ExchangeRequest[]>([]);
+  
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  // Filter exchange requests by status - these will be used throughout the component
+  const pendingRequests = exchangeRequests.filter(req => req.status.tag === 'Pending');
+  const inProgressRequests = exchangeRequests.filter(req => req.status.tag === 'InProgress');
+  const completedRequests = exchangeRequests.filter(req => req.status.tag === 'Completed');
+  
+  const stats = [ 
+    { label: 'Total Users', value: '12,543', change: '+12%', icon: Users }, 
+    { label: 'Active Opportunities', value: '6', change: '+2', icon: TrendingUp },
+    { label: 'Total Exchanges', value: '1,234', change: '+8%', icon: ArrowRightLeft },
+    { label: 'Revenue', value: '$45,678', change: '+15%', icon: TrendingUp },
+    { label: 'Weekly Engagement', value: '89%', change: '+5%', icon: FileText }, 
+    { label: 'Notifications Sent', value: '1,234', change: '+18%', icon: Bell }
+  ];
+  
+  const opportunities = [ 
+    { id: 1, title: 'Base Batch 002', status: 'Active', views: 1234, clicks: 456 }, 
+    { id: 2, title: 'Zora Creator Pass', status: 'Active', views: 987, clicks: 321 }, 
+    { id: 3, title: 'Onchain Summer', status: 'Active', views: 2341, clicks: 789 }, 
+  ]; 
+ 
+  const topUsers = [ 
+    { address: '0x1234...5678', points: 98543, transactions: 15243 }, 
+    { address: '0x2345...6789', points: 89234, transactions: 14102 }, 
+    { address: '0x3456...7890', points: 82105, transactions: 12884 }, 
+  ]; 
+ 
+  // Connect to SpacetimeDB 
+  useEffect(() => { 
+    const connectDb = async () => { 
+      try { 
+        const conn = await DbConnection.builder() 
+          .withUri('wss://testnet.spacetimedb.com') 
+          .withModuleName('diyama_exchange') 
+          .onConnect(async (ctx: DbContext) => { 
+            console.log('Admin connected to SpacetimeDB'); 
+            
+            // Subscribe to exchange requests 
+            await ctx.db.exchangeRequest().onInsert((ctx: any, req: ExchangeRequest) => { 
+              setExchangeRequests(prev => [req, ...prev]); 
+            }); 
+ 
+            await ctx.db.exchangeRequest().onUpdate((ctx: any, oldReq: ExchangeRequest, newReq: ExchangeRequest) => { 
+              setExchangeRequests(prev => 
+                prev.map(r => r.requestId === newReq.requestId ? newReq : r) 
+              ); 
+            }); 
+ 
+            // Load existing requests 
+            const allRequests = Array.from(ctx.db.exchangeRequest().iter()) as ExchangeRequest[]; 
+            setExchangeRequests(allRequests.sort((a, b) => { 
+              const timeA = a.createdAt.toDate().getTime(); 
+              const timeB = b.createdAt.toDate().getTime(); 
+              return timeB - timeA; 
+            })); 
+          }) 
+          .build(); 
+        
+        setDb(conn); 
+      } catch (error) { 
+        console.error('Failed to connect to SpacetimeDB:', error); 
+      } 
+    }; 
+ 
+    if (address) { 
+      connectDb(); 
+    } else {
+      // For development without wallet connection
+      connectDb();
+    } 
+ 
+    return () => { 
+      if (db) { 
+        db.disconnect(); 
+      } 
+    }; 
+  }, [address]); 
+ 
+  const getStatusIcon = (status: RequestStatus) => { 
+    switch (status.tag) { 
+      case 'Pending': 
+        return <Clock className="w-5 h-5 text-yellow-400" />; 
+      case 'InProgress': 
+        return <ArrowRightLeft className="w-5 h-5 text-blue-400" />; 
+      case 'Completed': 
+        return <CheckCircle2 className="w-5 h-5 text-green-400" />; 
+      case 'Cancelled': 
+        return <AlertCircle className="w-5 h-5 text-red-400" />; 
+    } 
+  }; 
+ 
+  const getStatusColor = (status: RequestStatus) => { 
+    switch (status.tag) { 
+      case 'Pending': 
+        return 'text-yellow-400 bg-yellow-400/10'; 
+      case 'InProgress': 
+        return 'text-blue-400 bg-blue-400/10'; 
+      case 'Completed': 
+        return 'text-green-400 bg-green-400/10'; 
+      case 'Cancelled': 
+        return 'text-red-400 bg-red-400/10'; 
+    } 
+  }; 
+ 
+  const updateRequestStatus = (requestId: bigint, newStatus: RequestStatus) => { 
+    if (db) { 
+      db.reducers.updateRequestStatusAdmin(requestId, newStatus, `Status updated by admin`); 
+    } 
+  }; 
+ 
+  // Using the filtered requests defined earlier
+ 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className={`bg-indigo-800 text-white ${isSidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 ease-in-out`}>
+    <div className="flex min-h-screen">
+      {/* Desktop Sidebar */}
+      <div className={`hidden md:flex flex-col bg-indigo-800 text-white w-64 transition-all duration-300 ease-in-out`}>
         <div className="p-4 flex items-center justify-between">
-          {isSidebarOpen && <h2 className="text-xl font-bold">DIYAMA Admin</h2>}
+          <h2 className="text-xl font-bold">DIYAMA Admin</h2>
           <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-indigo-700">
             <Menu size={24} />
           </button>
         </div>
-        <nav className="mt-6">
-          <div className={`px-4 py-3 cursor-pointer flex items-center ${activeTab === 'dashboard' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`} 
+        <nav className="mt-4 space-y-1">
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'dashboard' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`} 
                onClick={() => setActiveTab('dashboard')}>
             <Home size={20} />
-            {isSidebarOpen && <span className="ml-4">Dashboard</span>}
+            <span className="ml-3">Dashboard</span>
           </div>
-          <div className={`px-4 py-3 cursor-pointer flex items-center ${activeTab === 'users' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'users' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('users')}>
             <Users size={20} />
-            {isSidebarOpen && <span className="ml-4">Users</span>}
+            <span className="ml-3">Users</span>
           </div>
-          <div className={`px-4 py-3 cursor-pointer flex items-center ${activeTab === 'analytics' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'analytics' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('analytics')}>
             <BarChart2 size={20} />
-            {isSidebarOpen && <span className="ml-4">Analytics</span>}
+            <span className="ml-3">Analytics</span>
           </div>
-          <div className={`px-4 py-3 cursor-pointer flex items-center ${activeTab === 'content' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'content' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('content')}>
             <FileText size={20} />
-            {isSidebarOpen && <span className="ml-4">Content</span>}
+            <span className="ml-3">Content</span>
           </div>
-          <div className={`px-4 py-3 cursor-pointer flex items-center ${activeTab === 'settings' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'settings' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('settings')}>
             <Settings size={20} />
-            {isSidebarOpen && <span className="ml-4">Settings</span>}
+            <span className="ml-3">Settings</span>
           </div>
-          <div className="px-4 py-3 cursor-pointer flex items-center hover:bg-indigo-700 mt-auto">
+          <div className="px-4 py-3 cursor-pointer flex items-center hover:bg-indigo-700 rounded-lg mt-auto">
             <LogOut size={20} />
-            {isSidebarOpen && <span className="ml-4">Logout</span>}
+            <span className="ml-3">Logout</span>
           </div>
         </nav>
       </div>
 
+      {/* Mobile sidebar overlay */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={toggleSidebar} />
+          <div className="relative z-50 w-64 bg-indigo-800 text-white h-full p-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold">Menu</h2>
+              <button onClick={toggleSidebar} className="p-2 rounded-md hover:bg-indigo-700">
+                <Menu size={24} />
+              </button>
+            </div>
+            <nav className="mt-4 space-y-1">
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'dashboard' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`} 
+                  onClick={() => { setActiveTab('dashboard'); toggleSidebar(); }}>
+                <Home size={20} />
+                <span className="ml-3">Dashboard</span>
+              </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'users' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('users'); toggleSidebar(); }}>
+                <Users size={20} />
+                <span className="ml-3">Users</span>
+              </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'analytics' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('analytics'); toggleSidebar(); }}>
+                <BarChart2 size={20} />
+                <span className="ml-3">Analytics</span>
+              </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'content' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('content'); toggleSidebar(); }}>
+                <FileText size={20} />
+                <span className="ml-3">Content</span>
+              </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'settings' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('settings'); toggleSidebar(); }}>
+                <Settings size={20} />
+                <span className="ml-3">Settings</span>
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="bg-white shadow-sm">
+        {/* Header with branding */}
+        <header className="brand-gradient text-white shadow-md">
           <div className="flex items-center justify-between p-4">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
+            <div className="flex items-center gap-3">
+              <button onClick={toggleSidebar} className="md:hidden p-2 rounded-md hover:bg-indigo-700/60">
+                <Menu size={22} />
+              </button>
+              <span className="font-semibold">DIYAMA Admin</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative hidden sm:block">
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="pl-10 pr-4 py-2 rounded-lg bg-white/20 placeholder-white/80 text-white focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                <Search className="absolute left-3 top-2.5 text-white/80" size={18} />
               </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button className="relative p-2 rounded-full hover:bg-gray-100">
+              <button className="relative p-2 rounded-full hover:bg-white/10">
                 <Bell size={20} />
-                <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
+                <span className="absolute top-0 right-0 h-2 w-2 bg-red-400 rounded-full"></span>
               </button>
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
                   <User size={18} />
                 </div>
                 <span className="font-medium">Admin</span>
