@@ -29,6 +29,7 @@ export default function Nav() {
           <nav className="hidden md:flex items-center gap-1">
             {links.map((l) => (
               <Link
+                prefetch={false}
                 key={l.href}
                 href={l.href}
                 className="px-3 py-2 rounded-md text-sm text-slate-200 hover:text-white hover:bg-slate-800/60 transition"
@@ -64,6 +65,7 @@ export default function Nav() {
           <div className="px-4 py-3 grid grid-cols-1 gap-1">
             {links.map((l) => (
               <Link
+                prefetch={false}
                 key={l.href}
                 href={l.href}
                 className="px-3 py-2 rounded-md text-sm text-slate-200 hover:text-white hover:bg-slate-800/60 transition"
