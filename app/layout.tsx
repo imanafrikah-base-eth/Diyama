@@ -1,8 +1,9 @@
 import './globals.css';
+import Nav from "../components/Nav";
 
 export const metadata = {
-  title: 'DIYAMA Admin',
-  description: 'Mobile-optimized admin dashboard with blue branding',
+  title: 'Diyama App',
+  description: 'Mobile-first Onchain onboarding for creators on Base',
 }
 
 export default function RootLayout({
@@ -15,7 +16,10 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100">
+        <Nav />
+        {children}
+      </body>
     </html>
   )
 }
