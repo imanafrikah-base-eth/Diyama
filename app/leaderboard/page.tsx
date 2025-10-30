@@ -1,11 +1,11 @@
+import Section from "../../components/ui/Section";
+import Card from "../../components/ui/Card";
+
 export default function LeaderboardPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100">
-      <section className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-semibold">Leaderboard</h1>
-        <p className="mt-2 text-slate-300">Gamified points ranking for creators.</p>
-
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
+      <Section title="Leaderboard" description="Gamified points ranking for creators.">
+        <Card className="mt-6 overflow-hidden">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-800/60 text-slate-200">
               <tr>
@@ -24,8 +24,8 @@ export default function LeaderboardPage() {
               ))}
             </tbody>
           </table>
-        </div>
-      </section>
+        </Card>
+      </Section>
     </main>
   );
 }

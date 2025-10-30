@@ -1,6 +1,7 @@
 import './globals.css';
 import '@coinbase/onchainkit/styles.css';
 import Nav from "../components/Nav";
+import Footer from "../components/Footer";
 import { Providers } from "./providers";
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({
         <Providers>
           <Nav />
           {children}
+          <Footer />
         </Providers>
       </body>
     </html>

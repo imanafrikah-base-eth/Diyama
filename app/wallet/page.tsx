@@ -1,6 +1,8 @@
 import { Wallet } from "@coinbase/onchainkit/wallet";
 import { Identity, Avatar, Name, Address, EthBalance } from "@coinbase/onchainkit/identity";
 import ExchangeForm from "../../components/ExchangeForm";
+import Section from "../../components/ui/Section";
+import Card from "../../components/ui/Card";
 
 export default function WalletPage() {
   return (
@@ -10,7 +12,7 @@ export default function WalletPage() {
         <p className="mt-2 text-slate-300">Manage Base wallet and submit P2P USDC→Kwacha requests.</p>
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+          <Card className="p-4">
             <h2 className="font-medium text-slate-200">Wallet Overview</h2>
             <div className="mt-3">
               <Wallet>
@@ -22,7 +24,7 @@ export default function WalletPage() {
                 </Identity>
               </Wallet>
             </div>
-          </div>
+          </Card>
           <ExchangeForm />
         </div>
       </section>

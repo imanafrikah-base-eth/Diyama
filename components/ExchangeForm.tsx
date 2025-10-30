@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useAccount } from "wagmi";
+import Button from "./ui/Button";
+import Alert from "./Alert";
 
 export default function ExchangeForm() {
   const { address } = useAccount();
@@ -8,20 +10,25 @@ export default function ExchangeForm() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<null | { kwachaAmount: number; rateZMW: number }>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   async function submit() {
     setError(null);
     setResult(null);
     setLoading(true);
     try {
+      const amt = Number(amountUSDC);
+      if (!address) throw new Error("Please connect your wallet");
+      if (!amt || amt <= 0) throw new Error("Enter a valid USDC amount");
       const res = await fetch("/api/exchange/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountUSDC: Number(amountUSDC), baseAddress: address }),
+        body: JSON.stringify({ amountUSDC: amt, baseAddress: address }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Request failed");
       setResult({ kwachaAmount: data.kwachaAmount, rateZMW: data.rateZMW });
+      setSuccess("Exchange request submitted. Check admin inbox for email.");
     } catch (e: any) {
       setError(e?.message || "Something went wrong");
     } finally {
@@ -33,6 +40,7 @@ export default function ExchangeForm() {
     <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
       <h2 className="font-medium text-slate-200">P2P Exchange Request</h2>
       <p className="text-sm text-slate-400">USDC → ZMW with real-time rates, email sent to admin.</p>
+      {!address && <div className="mt-2"><Alert type="info" message="Connect your Base wallet to submit an exchange." /></div>}
 
       <div className="mt-3 grid grid-cols-1 gap-3">
         <input
@@ -42,13 +50,12 @@ export default function ExchangeForm() {
           value={amountUSDC}
           onChange={(e) => setAmountUSDC(e.target.value)}
         />
-        <button
-          disabled={loading || !amountUSDC}
+        <Button
+          disabled={loading || !amountUSDC || !address}
           onClick={submit}
-          className="px-3 py-2 rounded-md bg-gradient-to-tr from-indigo-600 via-sky-500 to-cyan-400 text-white font-medium disabled:opacity-60"
         >
           {loading ? "Submitting..." : "Submit Request"}
-        </button>
+        </Button>
       </div>
 
       {result && (
@@ -57,9 +64,8 @@ export default function ExchangeForm() {
           <div>Estimated: {result.kwachaAmount.toFixed(2)} ZMW</div>
         </div>
       )}
-      {error && (
-        <div className="mt-3 text-sm text-red-400">{error}</div>
-      )}
+      {success && <div className="mt-3"><Alert type="success" message={success} /></div>}
+      {error && <div className="mt-3"><Alert type="error" message={error} /></div>}
     </div>
   );
 }

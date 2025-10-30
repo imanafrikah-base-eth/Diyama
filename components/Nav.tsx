@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Wallet, ConnectWallet, WalletDropdown, WalletDropdownDisconnect } from "@coinbase/onchainkit/wallet";
 import { Identity, Avatar, Name, Address, EthBalance } from "@coinbase/onchainkit/identity";
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
 
   const links = [
     { href: "/", label: "Home" },
@@ -34,7 +36,7 @@ export default function Nav() {
                 prefetch={false}
                 key={l.href}
                 href={l.href}
-                className="px-3 py-2 rounded-md text-sm text-slate-200 hover:text-white hover:bg-slate-800/60 transition"
+                className={`px-3 py-2 rounded-md text-sm transition ${pathname === l.href ? "bg-slate-800/70 text-white border border-slate-700" : "text-slate-200 hover:text-white hover:bg-slate-800/60"}`}
               >
                 {l.label}
               </Link>
@@ -81,7 +83,7 @@ export default function Nav() {
                 prefetch={false}
                 key={l.href}
                 href={l.href}
-                className="px-3 py-2 rounded-md text-sm text-slate-200 hover:text-white hover:bg-slate-800/60 transition"
+                className={`px-3 py-2 rounded-md text-sm transition ${pathname === l.href ? "bg-slate-800/70 text-white border border-slate-700" : "text-slate-200 hover:text-white hover:bg-slate-800/60"}`}
                 onClick={() => setOpen(false)}
               >
                 {l.label}

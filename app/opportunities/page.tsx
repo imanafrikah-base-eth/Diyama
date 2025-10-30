@@ -1,19 +1,29 @@
+import Section from "../../components/ui/Section";
+import Card from "../../components/ui/Card";
+import Button from "../../components/ui/Button";
+
 export default function OpportunitiesPage() {
+  const items = [
+    { title: "Creator Grant", desc: "Apply for micro-grants to fund your next release.", href: "/learn" },
+    { title: "Community Bounty", desc: "Contribute tutorials and earn points.", href: "/community" },
+    { title: "Collab Gig", desc: "Join cross-border creative collaborations.", href: "/profile" },
+    { title: "NFT Drop", desc: "Mint limited releases and grow your audience.", href: "/mint" },
+    { title: "Onchain Task", desc: "Complete quests to earn leaderboard points.", href: "/leaderboard" },
+    { title: "News Feature", desc: "Get highlighted in the community feed.", href: "/news" },
+  ];
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100">
-      <section className="mx-auto max-w-6xl px-4 py-8">
-        <h1 className="text-2xl font-semibold">Opportunities</h1>
-        <p className="mt-2 text-slate-300">Trending creators, NFT drops, and onchain tasks.</p>
-
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-              <h3 className="font-medium text-slate-200">Opportunity #{i}</h3>
-              <p className="text-sm text-slate-400">Data via BaseScan/Zora/Farcaster/Dune.</p>
-            </div>
+      <Section title="Opportunities" description="Curated gigs, grants, and bounties for Base creators.">
+        <div className="grid md:grid-cols-3 gap-4">
+          {items.map((it) => (
+            <Card key={it.title} className="p-5">
+              <h3 className="text-slate-100 font-semibold">{it.title}</h3>
+              <p className="text-slate-300 text-sm">{it.desc}</p>
+              <div className="mt-3"><Button variant="ghost">Learn More</Button></div>
+            </Card>
           ))}
         </div>
-      </section>
+      </Section>
     </main>
   );
 }
