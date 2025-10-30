@@ -1,3 +1,7 @@
+import { Wallet } from "@coinbase/onchainkit/wallet";
+import { Identity, Avatar, Name, Address, EthBalance } from "@coinbase/onchainkit/identity";
+import ExchangeForm from "../../components/ExchangeForm";
+
 export default function WalletPage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100">
@@ -8,16 +12,18 @@ export default function WalletPage() {
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
             <h2 className="font-medium text-slate-200">Wallet Overview</h2>
-            <p className="text-sm text-slate-400">Address, ETH balance, recent activity.</p>
+            <div className="mt-3">
+              <Wallet>
+                <Identity className="px-2 pt-2 pb-2" hasCopyAddressOnClick>
+                  <Avatar />
+                  <Name />
+                  <Address />
+                  <EthBalance />
+                </Identity>
+              </Wallet>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
-            <h2 className="font-medium text-slate-200">P2P Exchange Request</h2>
-            <form className="mt-3 grid grid-cols-1 gap-3">
-              <input className="px-3 py-2 rounded-md bg-slate-800 text-slate-100 placeholder-slate-400 border border-slate-700" placeholder="Amount (USDC)" />
-              <input className="px-3 py-2 rounded-md bg-slate-800 text-slate-100 placeholder-slate-400 border border-slate-700" placeholder="Your Base address" />
-              <button className="px-3 py-2 rounded-md bg-gradient-to-tr from-indigo-600 via-sky-500 to-cyan-400 text-white font-medium">Submit Request</button>
-            </form>
-          </div>
+          <ExchangeForm />
         </div>
       </section>
     </main>

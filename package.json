@@ -8,12 +8,15 @@
     "start": "next start"
   },
   "dependencies": {
+    "@coinbase/onchainkit": "^1.0.3",
     "framer-motion": "^10.12.12",
     "lucide-react": "^0.268.0",
     "next": "13.5.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "wagmi": "^2.10.3"
+    "resend": "^6.3.0",
+    "viem": "^2.38.5",
+    "wagmi": "^2.19.1"
   },
   "devDependencies": {
     "@types/node": "^24.9.2",

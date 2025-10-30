@@ -1,5 +1,7 @@
 import './globals.css';
+import '@coinbase/onchainkit/styles.css';
 import Nav from "../components/Nav";
+import { Providers } from "./providers";
 
 export const metadata = {
   title: 'Diyama App',
@@ -17,8 +19,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
       <body className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-black text-slate-100">
-        <Nav />
-        {children}
+        <Providers>
+          <Nav />
+          {children}
+        </Providers>
       </body>
     </html>
   )

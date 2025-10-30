@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Wallet, ConnectWallet, WalletDropdown, WalletDropdownDisconnect } from "@coinbase/onchainkit/wallet";
+import { Identity, Avatar, Name, Address, EthBalance } from "@coinbase/onchainkit/identity";
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
@@ -40,12 +42,23 @@ export default function Nav() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {/* Wallet connect placeholder; replace with OnchainKit component later */}
-            <button
-              className="px-3 py-2 rounded-md text-sm font-medium bg-gradient-to-tr from-indigo-600 via-sky-500 to-cyan-400 text-white shadow-sm hover:opacity-90 transition"
-            >
-              Connect Wallet
-            </button>
+            <div className="hidden md:flex">
+              <Wallet>
+                <ConnectWallet className="px-3 py-2 rounded-md text-sm font-medium bg-gradient-to-tr from-indigo-600 via-sky-500 to-cyan-400 text-white shadow-sm hover:opacity-90 transition">
+                  <Avatar className="h-5 w-5" />
+                  <Name />
+                </ConnectWallet>
+                <WalletDropdown>
+                  <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
+                    <Avatar />
+                    <Name />
+                    <Address />
+                    <EthBalance />
+                  </Identity>
+                  <WalletDropdownDisconnect />
+                </WalletDropdown>
+              </Wallet>
+            </div>
 
             <button
               className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-slate-200 hover:bg-slate-800/60"
@@ -74,6 +87,14 @@ export default function Nav() {
                 {l.label}
               </Link>
             ))}
+            <div className="mt-2">
+              <Wallet>
+                <ConnectWallet className="w-full justify-center px-3 py-2 rounded-md text-sm font-medium bg-gradient-to-tr from-indigo-600 via-sky-500 to-cyan-400 text-white shadow-sm hover:opacity-90 transition">
+                  <Avatar className="h-5 w-5" />
+                  <Name />
+                </ConnectWallet>
+              </Wallet>
+            </div>
           </div>
         </div>
       )}
