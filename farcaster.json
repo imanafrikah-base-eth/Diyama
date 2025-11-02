@@ -1,0 +1,31 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjEwODg5OTYsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgwMDA5OGZkMjVlM0Y5NDI4MjA5NjE2OWU3Njc2NUJEOEQzRTRlMDc3In0",
+    "payload": "eyJkb21haW4iOiJxdWljay1ldmVuaW5nLTc5NS5hcHAub2hhcmEuYWkifQ",
+    "signature": "xYslk8LkFAKm4hBElZnNJ6Nf6X+FDfiH/NpqZ1NEQK830lHKmNJmyzS9xJR0rsD0LGE43oM+CcMd5pNDlz9K2Bw="
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Diyama: Onchain Gateway",
+    "iconUrl": "https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_c0886416-a207-4eb4-afca-fd582803f356-oCr0NJTLXsCKn2ejz2YPiQrpXU2uhS",
+    "homeUrl": "https://quick-evening-795.app.ohara.ai",
+    "imageUrl": "https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_c0886416-a207-4eb4-afca-fd582803f356-oCr0NJTLXsCKn2ejz2YPiQrpXU2uhS",
+    "buttonTitle": "Open with Ohara",
+    "splashImageUrl": "https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/farcaster/splash_images/splash_image1.svg",
+    "splashBackgroundColor": "#ffffff",
+    "tags": [
+      "ohara",
+      "mini-app",
+      "base",
+      "farcaster"
+    ],
+    "primaryCategory": "entertainment",
+    "ogTitle": "Diyama: Onchain Gateway",
+    "ogImageUrl": "https://usdozf7pplhxfvrl.public.blob.vercel-storage.com/thumbnail_c0886416-a207-4eb4-afca-fd582803f356-oCr0NJTLXsCKn2ejz2YPiQrpXU2uhS"
+  },
+  "baseBuilder": {
+    "allowedAddresses": [
+      ""
+    ]
+  }
+}

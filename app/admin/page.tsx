@@ -1,9 +1,21 @@
 'use client'; 
  
-import { motion } from 'framer-motion'; 
 import Link from 'next/link'; 
-import { Menu, Search, User, Bell, BarChart2, Users, FileText, Settings, LogOut, LayoutDashboard, TrendingUp, Edit, Home, ArrowRightLeft, Phone, CheckCircle2, Clock, AlertCircle } from 'lucide-react'; 
+import { Menu, Search, User, Bell, BarChart2, Users, FileText, Settings, LogOut, LayoutDashboard, TrendingUp, Edit, Home, ArrowRightLeft, Phone, CheckCircle2, Clock, AlertCircle, Shield, UserPlus, RefreshCw } from 'lucide-react'; 
 import { useState, useEffect } from 'react';
+import Button from '@/components/ui/Button';
+
+// Import SpacetimeDB types and components
+import { 
+  DbConnection, 
+  type EventContext, 
+  type ExchangeRequest, 
+  type Admin, 
+  type RequestStatus,
+  RemoteReducers,
+  RemoteTables,
+  SetReducerFlags
+} from '@/spacetime_module_bindings';
 
 // Mock wagmi hook for development
 const useAccount = () => {
@@ -12,66 +24,31 @@ const useAccount = () => {
 
 // Temporary mock components until we install the actual packages
 const WalletDefault = () => <div className="p-2 glass rounded-full">Connect Wallet</div>;
-const Button = ({ children, className, size, variant, onClick }: any) => (
-  <button 
-    onClick={onClick}
-    className={`px-4 py-2 rounded-md ${className || 'bg-blue-500 hover:bg-blue-600'} ${
-      size === 'sm' ? 'text-sm px-2 py-1' : ''
-    } ${variant === 'destructive' ? 'bg-red-500 hover:bg-red-600' : ''}`}
-  >
-    {children}
-  </button>
-);
 
-// Mock types and interfaces
-interface RequestStatus {
-  tag: string;
-  message: string;
+// Enhanced interfaces for admin functionality
+interface AdminUser {
+  identity: string;
+  addedAt: Date;
+  isActive: boolean;
 }
 
-interface ExchangeRequest {
-  requestId: { toString: () => string };
-  userAddress: string;
-  usdcAmount: { toString: () => string };
-  kwaAmount: { toString: () => string };
-  status: RequestStatus;
-  createdAt: { toDate: () => Date };
-}
-
-// Mock DbConnection for development
-interface DbContext {
-  db: {
-    exchangeRequest: () => {
-      onInsert: (callback: any) => Promise<void>;
-      onUpdate: (callback: any) => Promise<void>;
-      iter: () => any[];
-    };
-  };
-}
-
-class DbConnection {
-  static builder() {
-    return {
-      withUri: (uri: string) => ({
-        withModuleName: (moduleName: string) => ({
-          onConnect: (callback: (ctx: DbContext) => void) => ({
-            build: () => {
-              console.log('Mock DbConnection created');
-              return { uri, moduleName };
-            }
-          })
-        })
-      })
-    };
-  }
+interface ExchangeRequestExtended extends ExchangeRequest {
+  // ExchangeRequest already includes all necessary properties:
+  // requestId, userIdentity, userWalletAddress, phoneNumber, fullName,
+  // usdcAmount, kwachaAmount, status, createdAt, notes
 }
  
 export default function AdminPage() { 
-  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'notifications' | 'exchanges' | 'dashboard' | 'users' | 'settings'>('exchanges'); 
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'notifications' | 'exchanges' | 'dashboard' | 'users' | 'settings' | 'admins'>('exchanges'); 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { address } = useAccount(); 
-  const [db, setDb] = useState<any>(null); 
-  const [exchangeRequests, setExchangeRequests] = useState<ExchangeRequest[]>([]);
+  const [db, setDb] = useState<DbConnection | null>(null); 
+  const [reducers, setReducers] = useState<RemoteReducers | null>(null);
+  const [exchangeRequests, setExchangeRequests] = useState<ExchangeRequestExtended[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<ExchangeRequestExtended | null>(null);
+  const [statusUpdateNotes, setStatusUpdateNotes] = useState('');
   
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -81,6 +58,7 @@ export default function AdminPage() {
   const pendingRequests = exchangeRequests.filter(req => req.status.tag === 'Pending');
   const inProgressRequests = exchangeRequests.filter(req => req.status.tag === 'InProgress');
   const completedRequests = exchangeRequests.filter(req => req.status.tag === 'Completed');
+  const cancelledRequests = exchangeRequests.filter(req => req.status.tag === 'Cancelled');
   
   const stats = [ 
     { label: 'Total Users', value: '12,543', change: '+12%', icon: Users }, 
@@ -103,34 +81,118 @@ export default function AdminPage() {
     { address: '0x3456...7890', points: 82105, transactions: 12884 }, 
   ]; 
  
+  // Admin functions
+  const updateRequestStatus = async (requestId: bigint, newStatus: RequestStatus, notes: string) => {
+    if (!reducers) return;
+    
+    setIsLoading(true);
+    try {
+      reducers.updateRequestStatusAdmin(requestId, newStatus, notes);
+      setSelectedRequest(null);
+      setStatusUpdateNotes('');
+    } catch (error) {
+      console.error('Failed to update request status:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addAdmin = async (identity: string) => {
+    if (!reducers) return;
+    
+    setIsLoading(true);
+    try {
+      const identityObj = { __identity_bytes: identity } as any;
+      reducers.addAdmin(identityObj);
+    } catch (error) {
+      console.error('Failed to add admin:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getAllRequests = async () => {
+    if (!reducers) return;
+    
+    try {
+      reducers.getAllRequestsForAdmin();
+    } catch (error) {
+      console.error('Failed to get all requests:', error);
+    }
+  };
+
   // Connect to SpacetimeDB 
   useEffect(() => { 
     const connectDb = async () => { 
       try { 
-        const conn = await DbConnection.builder() 
-          .withUri('wss://testnet.spacetimedb.com') 
-          .withModuleName('diyama_exchange') 
-          .onConnect(async (ctx: DbContext) => { 
-            console.log('Admin connected to SpacetimeDB'); 
+        const conn = await DbConnection.builder()
+          .withUri('wss://testnet.spacetimedb.com')
+          .withModuleName('diyama_exchange')
+          .onConnect(async (connection, identity, token) => {
+            console.log('Admin connected to SpacetimeDB');
             
-            // Subscribe to exchange requests 
-            await ctx.db.exchangeRequest().onInsert((ctx: any, req: ExchangeRequest) => { 
-              setExchangeRequests(prev => [req, ...prev]); 
+            // Set up reducers
+            setReducers(connection.reducers);
+            
+            // Subscribe to exchange requests
+            await connection.db.exchangeRequest.onInsert((ctx: EventContext, req: ExchangeRequest) => {
+              const extendedReq: ExchangeRequestExtended = {
+                ...req,
+                userWalletAddress: req.userWalletAddress || '',
+                phoneNumber: req.phoneNumber || '',
+                fullName: req.fullName || '',
+                notes: req.notes || ''
+              };
+              setExchangeRequests(prev => [extendedReq, ...prev]);
             }); 
  
-            await ctx.db.exchangeRequest().onUpdate((ctx: any, oldReq: ExchangeRequest, newReq: ExchangeRequest) => { 
+            await connection.db.exchangeRequest.onUpdate((ctx: EventContext, oldReq: ExchangeRequest, newReq: ExchangeRequest) => { 
+              const extendedReq: ExchangeRequestExtended = {
+                ...newReq,
+                userWalletAddress: newReq.userWalletAddress || '',
+                phoneNumber: newReq.phoneNumber || '',
+                fullName: newReq.fullName || '',
+                notes: newReq.notes || ''
+              };
               setExchangeRequests(prev => 
-                prev.map(r => r.requestId === newReq.requestId ? newReq : r) 
+                prev.map(r => r.requestId === newReq.requestId ? extendedReq : r) 
               ); 
             }); 
+
+            // Subscribe to admin changes
+            await connection.db.admin.onInsert((ctx: EventContext, admin: Admin) => {
+              const adminUser: AdminUser = {
+                identity: admin.identity.toString(),
+                addedAt: new Date(admin.addedAt.toDate()),
+                isActive: true
+              };
+              setAdminUsers(prev => [adminUser, ...prev]);
+            });
  
             // Load existing requests 
-            const allRequests = Array.from(ctx.db.exchangeRequest().iter()) as ExchangeRequest[]; 
-            setExchangeRequests(allRequests.sort((a, b) => { 
-              const timeA = a.createdAt.toDate().getTime(); 
-              const timeB = b.createdAt.toDate().getTime(); 
+            const allRequests = Array.from(connection.db.exchangeRequest.iter()) as ExchangeRequest[]; 
+            const extendedRequests: ExchangeRequestExtended[] = allRequests.map(req => ({
+              ...req,
+              userWalletAddress: req.userWalletAddress || '',
+              phoneNumber: req.phoneNumber || '',
+              fullName: req.fullName || '',
+              notes: req.notes || ''
+            }));
+            
+            setExchangeRequests(extendedRequests.sort((a, b) => { 
+              const timeA = new Date(a.createdAt.toDate()).getTime(); 
+              const timeB = new Date(b.createdAt.toDate()).getTime(); 
               return timeB - timeA; 
             })); 
+
+            // Load existing admins
+            const allAdmins = Array.from(connection.db.admin.iter()) as Admin[];
+            const adminUsers: AdminUser[] = allAdmins.map(admin => ({
+              identity: admin.identity.toString(),
+              addedAt: new Date(admin.addedAt.toDate()),
+              isActive: true
+            }));
+            setAdminUsers(adminUsers);
           }) 
           .build(); 
         
@@ -149,7 +211,7 @@ export default function AdminPage() {
  
     return () => { 
       if (db) { 
-        db.disconnect(); 
+        // Cleanup connection 
       } 
     }; 
   }, [address]); 
@@ -157,36 +219,35 @@ export default function AdminPage() {
   const getStatusIcon = (status: RequestStatus) => { 
     switch (status.tag) { 
       case 'Pending': 
-        return <Clock className="w-5 h-5 text-yellow-400" />; 
+        return <Clock size={12} />; 
       case 'InProgress': 
-        return <ArrowRightLeft className="w-5 h-5 text-blue-400" />; 
+        return <ArrowRightLeft size={12} />; 
       case 'Completed': 
-        return <CheckCircle2 className="w-5 h-5 text-green-400" />; 
+        return <CheckCircle2 size={12} />; 
       case 'Cancelled': 
-        return <AlertCircle className="w-5 h-5 text-red-400" />; 
+        return <AlertCircle size={12} />; 
+      default:
+        return null;
     } 
   }; 
  
   const getStatusColor = (status: RequestStatus) => { 
     switch (status.tag) { 
       case 'Pending': 
-        return 'text-yellow-400 bg-yellow-400/10'; 
+        return 'bg-yellow-100 text-yellow-800'; 
       case 'InProgress': 
-        return 'text-blue-400 bg-blue-400/10'; 
+        return 'bg-blue-100 text-blue-800'; 
       case 'Completed': 
-        return 'text-green-400 bg-green-400/10'; 
+        return 'bg-green-100 text-green-800'; 
       case 'Cancelled': 
-        return 'text-red-400 bg-red-400/10'; 
+        return 'bg-red-100 text-red-800'; 
+      default:
+        return 'bg-gray-100 text-gray-800';
     } 
   }; 
  
-  const updateRequestStatus = (requestId: bigint, newStatus: RequestStatus) => { 
-    if (db) { 
-      db.reducers.updateRequestStatusAdmin(requestId, newStatus, `Status updated by admin`); 
-    } 
-  }; 
  
-  // Using the filtered requests defined earlier
+   // Using the filtered requests defined earlier
  
   return (
     <div className="flex min-h-screen">
@@ -204,10 +265,20 @@ export default function AdminPage() {
             <Home size={20} />
             <span className="ml-3">Dashboard</span>
           </div>
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'exchanges' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+               onClick={() => setActiveTab('exchanges')}>
+            <ArrowRightLeft size={20} />
+            <span className="ml-3">Exchanges</span>
+          </div>
           <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'users' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('users')}>
             <Users size={20} />
             <span className="ml-3">Users</span>
+          </div>
+          <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'admins' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+               onClick={() => setActiveTab('admins')}>
+            <Shield size={20} />
+            <span className="ml-3">Admins</span>
           </div>
           <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'analytics' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                onClick={() => setActiveTab('analytics')}>
@@ -248,10 +319,20 @@ export default function AdminPage() {
                 <Home size={20} />
                 <span className="ml-3">Dashboard</span>
               </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'exchanges' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('exchanges'); toggleSidebar(); }}>
+                <ArrowRightLeft size={20} />
+                <span className="ml-3">Exchanges</span>
+              </div>
               <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'users' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                   onClick={() => { setActiveTab('users'); toggleSidebar(); }}>
                 <Users size={20} />
                 <span className="ml-3">Users</span>
+              </div>
+              <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'admins' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
+                  onClick={() => { setActiveTab('admins'); toggleSidebar(); }}>
+                <Shield size={20} />
+                <span className="ml-3">Admins</span>
               </div>
               <div className={`px-4 py-3 cursor-pointer flex items-center rounded-lg ${activeTab === 'analytics' ? 'bg-indigo-700' : 'hover:bg-indigo-700'}`}
                   onClick={() => { setActiveTab('analytics'); toggleSidebar(); }}>
@@ -488,6 +569,248 @@ export default function AdminPage() {
                     <button className="mt-4 text-indigo-600 hover:text-indigo-800">Manage →</button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'exchanges' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">Exchange Requests</h1>
+                <Button onClick={getAllRequests} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <RefreshCw size={16} className="mr-2" />
+                  Refresh
+                </Button>
+              </div>
+              
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-gray-500">Pending</h3>
+                    <Clock className="text-yellow-500" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold mt-2">{pendingRequests.length}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-gray-500">In Progress</h3>
+                    <ArrowRightLeft className="text-blue-500" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold mt-2">{inProgressRequests.length}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-gray-500">Completed</h3>
+                    <CheckCircle2 className="text-green-500" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold mt-2">{completedRequests.length}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-gray-500">Cancelled</h3>
+                    <AlertCircle className="text-red-500" size={24} />
+                  </div>
+                  <p className="text-3xl font-bold mt-2">{cancelledRequests.length}</p>
+                </div>
+              </div>
+
+              {/* Exchange Requests Table */}
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold">All Exchange Requests</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {exchangeRequests.map((request) => (
+                        <tr key={request.requestId.toString()}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{request.fullName || 'N/A'}</div>
+                              <div className="text-sm text-gray-500">{request.userWalletAddress}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                             <div className="text-sm text-gray-900">{request.usdcAmount} USDC</div>
+                             <div className="text-sm text-gray-500">{request.kwachaAmount} MWK</div>
+                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{request.phoneNumber || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                              {getStatusIcon(request.status)}
+                              <span className="ml-1">{request.status.tag}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(request.createdAt.toDate()).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Button
+                              size="sm"
+                              onClick={() => setSelectedRequest(request)}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                              Manage
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Request Management Modal */}
+              {selectedRequest && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 className="text-lg font-semibold mb-4">Manage Exchange Request</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">User</label>
+                        <p className="text-sm text-gray-900">{selectedRequest.fullName || selectedRequest.userWalletAddress}</p>
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                         <p className="text-sm text-gray-900">{selectedRequest.usdcAmount} USDC → {selectedRequest.kwachaAmount} MWK</p>
+                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <p className="text-sm text-gray-900">{selectedRequest.phoneNumber || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Current Status</label>
+                        <p className="text-sm text-gray-900">{selectedRequest.status.tag}</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <textarea
+                          value={statusUpdateNotes}
+                          onChange={(e) => setStatusUpdateNotes(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          rows={3}
+                          placeholder="Add notes for status update..."
+                        />
+                      </div>
+                      <div className="flex space-x-2">
+                        {selectedRequest.status.tag === 'Pending' && (
+                          <Button
+                            onClick={() => updateRequestStatus(selectedRequest.requestId, { tag: 'InProgress' } as RequestStatus, statusUpdateNotes)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={isLoading}
+                          >
+                            Start Processing
+                          </Button>
+                        )}
+                        {selectedRequest.status.tag === 'InProgress' && (
+                          <Button
+                            onClick={() => updateRequestStatus(selectedRequest.requestId, { tag: 'Completed' } as RequestStatus, statusUpdateNotes)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            disabled={isLoading}
+                          >
+                            Mark Complete
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => updateRequestStatus(selectedRequest.requestId, { tag: 'Cancelled' } as RequestStatus, statusUpdateNotes)}
+                          variant="destructive"
+                          disabled={isLoading}
+                        >
+                          Cancel Request
+                        </Button>
+                      </div>
+                      <div className="flex justify-end space-x-2 pt-4">
+                        <Button
+                          onClick={() => setSelectedRequest(null)}
+                          className="bg-gray-300 hover:bg-gray-400 text-gray-700"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'admins' && (
+            <div>
+              <h1 className="text-2xl font-bold mb-6">Admin Management</h1>
+              <div className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="p-4 flex justify-between items-center border-b">
+                  <h3 className="font-semibold">Admin Users</h3>
+                  <Button
+                    onClick={() => {
+                      const identity = prompt('Enter identity to add as admin:');
+                      if (identity) addAdmin(identity);
+                    }}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  >
+                    <UserPlus size={16} className="mr-2" />
+                    Add Admin
+                  </Button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identity</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Added Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {adminUsers.map((admin, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <Shield className="text-indigo-600 mr-3" size={20} />
+                              <div className="text-sm font-medium text-gray-900">{admin.identity}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {admin.addedAt.toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              admin.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {admin.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to remove this admin?')) {
+                                  // Implement remove admin functionality
+                                }
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
